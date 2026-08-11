@@ -1,6 +1,6 @@
 # Odoo 19 Installer
 
-Minimal automated installer for Odoo 19 Community on Ubuntu 24.04 LTS.
+Minimal automated installer for Odoo 19 Community on Ubuntu.
 
 ## Install
 
@@ -10,18 +10,43 @@ cd odoo19-installer
 sudo ./install.sh
 ```
 
-The script installs PostgreSQL, the official Odoo 19 Community package, generates a random master password, configures Odoo, and enables the systemd service.
+The installer:
+
+- Detects the Ubuntu version.
+- Warns when the server is not Ubuntu 24.04 LTS, but continues.
+- Installs PostgreSQL and required packages.
+- Adds the Odoo 19 Community Debian repository.
+- Installs Odoo 19.
+- Generates a random master password.
+- Creates `/etc/odoo.conf`.
+- Enables and starts the Odoo systemd service.
+- Saves the installation details securely in `/root/odoo19-install.txt`.
+
+> **Compatibility note:** Odoo's official Odoo 19 Debian package is documented for Ubuntu 24.04 LTS (Noble). Other Ubuntu releases are allowed by this installer with a warning, but package compatibility is not guaranteed.
 
 ## Configuration
 
-Edit `config.env` before installation if you need a different port, user, or configuration path.
+Edit `config.env` before installation if you need a different Odoo port, system user, or configuration path.
 
 ## Useful commands
 
 ```bash
 sudo systemctl status odoo
 sudo systemctl restart odoo
+sudo systemctl stop odoo
 sudo journalctl -u odoo -f
 ```
 
-Odoo 19's official Debian repository supports Ubuntu 24.04 LTS (Noble). See the [Odoo 19 documentation](https://www.odoo.com/documentation/19.0/administration/on_premise/packages.html).
+## Installation credentials
+
+After installation, the generated master password is stored in:
+
+```text
+/root/odoo19-install.txt
+```
+
+The file is created with permissions restricted to root.
+
+## Official documentation
+
+[Odoo 19 On-Premise Installation](https://www.odoo.com/documentation/19.0/administration/on_premise/packages.html)
