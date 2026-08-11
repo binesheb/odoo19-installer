@@ -1,0 +1,5 @@
+*.log
+*.key
+*.pem
+.env
+.env.*
