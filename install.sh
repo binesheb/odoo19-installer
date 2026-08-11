@@ -26,62 +26,116 @@ if [[ "${VERSION_ID:-}" != "24.04" ]]; then
   echo
   echo "WARNING: This installer is designed for Ubuntu 24.04 LTS."
   echo "Detected: ${PRETTY_NAME:-Ubuntu ${VERSION_ID:-unknown}}"
-  echo "Odoo's official Odoo 19 Debian package may not officially support this Ubuntu release."
-  echo "The installation will continue anyway."
+  echo "Docker deployment will continue."
   echo
 fi
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "==> Installing prerequisites"
-apt-get update
-apt-get install -y ca-certificates curl gnupg openssl postgresql
+install_docker() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    echo "==> Docker and Compose already installed"
+    return
+  fi
 
-systemctl enable --now postgresql
+  echo "==> Installing Docker Engine and Compose"
+  apt-get update
+  apt-get install -y ca-certificates curl
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
 
-echo "==> Adding Odoo $ODOO_VERSION repository"
-install -d -m 0755 /usr/share/keyrings
-curl -fsSL https://nightly.odoo.com/odoo.key \
-  | gpg --dearmor --yes -o /usr/share/keyrings/odoo-archive-keyring.gpg
+  . /etc/os-release
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" \
+    > /etc/apt/sources.list.d/docker.list
 
-echo "deb [signed-by=/usr/share/keyrings/odoo-archive-keyring.gpg] https://nightly.odoo.com/$ODOO_VERSION/nightly/deb/ ./" \
-  > /etc/apt/sources.list.d/odoo.list
+  apt-get update
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  systemctl enable --now docker
+}
 
-apt-get update
-apt-get install -y odoo
+install_docker
 
-MASTER_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+cd "$SCRIPT_DIR"
 
-if [[ -f "$ODOO_CONFIG" ]]; then
-  cp "$ODOO_CONFIG" "$ODOO_CONFIG.bak.$(date +%Y%m%d%H%M%S)"
+mkdir -p config addons
+
+POSTGRES_PASSWORD_FILE="$SCRIPT_DIR/.env"
+
+if [[ ! -f "$POSTGRES_PASSWORD_FILE" ]]; then
+  POSTGRES_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+  cat > "$POSTGRES_PASSWORD_FILE" <<EOF
+ODOO_VERSION=$ODOO_VERSION
+ODOO_PORT=$ODOO_PORT
+POSTGRES_VERSION=$POSTGRES_VERSION
+POSTGRES_DB=$POSTGRES_DB
+POSTGRES_USER=$POSTGRES_USER
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+EOF
+  chmod 600 "$POSTGRES_PASSWORD_FILE"
+else
+  echo "==> Existing .env found; keeping existing credentials"
+  source "$POSTGRES_PASSWORD_FILE"
 fi
 
-cat > "$ODOO_CONFIG" <<EOF
+if [[ ! -f config/odoo.conf ]]; then
+  ODOO_MASTER_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+
+  cat > config/odoo.conf <<EOF
 [options]
-admin_passwd = $MASTER_PASSWORD
-http_port = $ODOO_PORT
+admin_passwd = $ODOO_MASTER_PASSWORD
+db_host = db
+db_port = 5432
+db_user = $POSTGRES_USER
+db_password = $POSTGRES_PASSWORD
+http_port = 8069
 proxy_mode = False
+addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
 EOF
 
-chown root:root "$ODOO_CONFIG"
-chmod 640 "$ODOO_CONFIG"
+  chmod 640 config/odoo.conf
 
-systemctl daemon-reload
-systemctl enable --now odoo
+  cat >> "$POSTGRES_PASSWORD_FILE" <<EOF
+ODOO_MASTER_PASSWORD=$ODOO_MASTER_PASSWORD
+EOF
+else
+  echo "==> Existing Odoo configuration found; keeping existing master password"
+  ODOO_MASTER_PASSWORD="$(grep '^admin_passwd' config/odoo.conf | cut -d'=' -f2- | xargs)"
+fi
+
+echo "==> Pulling Docker images"
+docker compose pull
+
+echo "==> Starting Odoo and PostgreSQL"
+docker compose up -d
+
+echo "==> Waiting for containers"
+sleep 5
+
+docker compose ps
 
 SERVER_IP="$(hostname -I | awk '{print $1}')"
 
 cat > /root/odoo19-install.txt <<EOF
-Odoo 19 installation completed.
+Odoo 19 Docker installation completed.
 URL: http://$SERVER_IP:$ODOO_PORT
-Master password: $MASTER_PASSWORD
-Config: $ODOO_CONFIG
+Odoo master password: $ODOO_MASTER_PASSWORD
+PostgreSQL user: $POSTGRES_USER
+PostgreSQL password: $POSTGRES_PASSWORD
+Project: $SCRIPT_DIR
 OS: $PRETTY_NAME
 EOF
 chmod 600 /root/odoo19-install.txt
 
 echo
 echo "========================================"
-echo " Odoo 19 installation completed"
+echo " Odoo 19 Docker installation completed"
 echo "========================================"
-cat /root/odoo19-install.txt
+echo "URL: http://$SERVER_IP:$ODOO_PORT"
+echo "Credentials: /root/odoo19-install.txt"
+echo
+echo "Manage with:"
+echo "  docker compose ps"
+echo "  docker compose logs -f odoo"
+echo "  docker compose restart"
