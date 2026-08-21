@@ -3,3 +3,4 @@
 *.pem
 .env
 .env.*
+.last-update-revision
