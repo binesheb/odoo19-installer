@@ -1,0 +1,26 @@
+name: Validate deployment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: |
+          bash -n install.sh
+          bash -n scripts/update.sh
+
+      - name: Validate Docker Compose
+        run: |
+          cp config.env .env
+          docker compose config >/dev/null
