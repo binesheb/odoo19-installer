@@ -107,11 +107,8 @@ fi
 echo "==> Pulling Docker images"
 docker compose pull
 
-echo "==> Starting Odoo and PostgreSQL"
-docker compose up -d
-
-echo "==> Waiting for containers"
-sleep 5
+echo "==> Starting Odoo and PostgreSQL and waiting for readiness"
+docker compose up -d --wait --wait-timeout 120
 
 docker compose ps
 
