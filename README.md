@@ -19,7 +19,7 @@ The installer:
 - Creates an Odoo 19 container.
 - Creates persistent Docker volumes for PostgreSQL and Odoo data.
 - Generates secure PostgreSQL and Odoo master passwords.
-- Starts the stack automatically.
+- Starts the stack automatically and waits for Compose services to report readiness.
 - Saves installation credentials securely in `/root/odoo19-install.txt`.
 
 ## Architecture
@@ -54,6 +54,12 @@ docker compose restart
 docker compose stop
 docker compose start
 docker compose down
+```
+
+To start the stack and wait until Compose reports the services as ready:
+
+```bash
+docker compose up -d --wait --wait-timeout 120
 ```
 
 To remove containers without deleting persistent data:
