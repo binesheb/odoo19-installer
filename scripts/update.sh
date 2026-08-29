@@ -35,14 +35,14 @@ PREVIOUS="$LOCAL"
 rollback() {
   echo "Update failed; restoring repository revision $PREVIOUS." >&2
   git reset --hard "$PREVIOUS"
-  docker compose up -d --remove-orphans || true
+  docker compose up -d --wait --wait-timeout 120 --remove-orphans || true
 }
 trap rollback ERR
 
 git merge --ff-only "origin/$BRANCH"
 docker compose config >/dev/null
 docker compose pull
-docker compose up -d --remove-orphans
+docker compose up -d --wait --wait-timeout 120 --remove-orphans
 
 echo "$PREVIOUS" > .last-update-revision
 trap - ERR
