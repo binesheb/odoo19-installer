@@ -64,7 +64,7 @@ mkdir -p config addons
 POSTGRES_PASSWORD_FILE="$SCRIPT_DIR/.env"
 
 if [[ ! -f "$POSTGRES_PASSWORD_FILE" ]]; then
-  POSTGRES_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+  POSTGRES_PASSWORD="$(openssl rand -hex 16)"
   cat > "$POSTGRES_PASSWORD_FILE" <<EOF
 ODOO_VERSION=$ODOO_VERSION
 ODOO_PORT=$ODOO_PORT
@@ -80,7 +80,7 @@ else
 fi
 
 if [[ ! -f config/odoo.conf ]]; then
-  ODOO_MASTER_PASSWORD="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+  ODOO_MASTER_PASSWORD="$(openssl rand -hex 16)"
 
   cat > config/odoo.conf <<EOF
 [options]
@@ -106,7 +106,6 @@ fi
 
 echo "==> Pulling Docker images"
 docker compose pull
-
 echo "==> Starting Odoo and PostgreSQL and waiting for readiness"
 docker compose up -d --wait --wait-timeout 120
 
