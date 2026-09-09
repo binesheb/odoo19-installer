@@ -40,7 +40,7 @@ install_docker() {
 
   echo "==> Installing Docker Engine and Compose"
   apt-get update
-  apt-get install -y ca-certificates curl
+  apt-get install -y ca-certificates curl openssl
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     -o /etc/apt/keyrings/docker.asc
