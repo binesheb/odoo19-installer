@@ -33,6 +33,20 @@ if [[ "${VERSION_ID:-}" != "24.04" ]]; then
   echo
 fi
 
+required_config=(ODOO_VERSION ODOO_PORT POSTGRES_VERSION POSTGRES_DB POSTGRES_USER)
+for variable in "${required_config[@]}"; do
+  if [[ -z "${!variable:-}" ]]; then
+    echo "ERROR: Required configuration value is missing: $variable"
+    echo "Check config.env and provide a non-empty value."
+    exit 1
+  fi
+done
+
+if ! [[ "$ODOO_PORT" =~ ^[0-9]+$ ]] || (( ODOO_PORT < 1 || ODOO_PORT > 65535 )); then
+  echo "ERROR: ODOO_PORT must be a TCP port between 1 and 65535."
+  exit 1
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 
 install_docker() {
