@@ -5,7 +5,37 @@ set -euo pipefail
 umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/config.env"
+
+# Read simple KEY=value configuration without executing the file as shell code.
+read_env_value() {
+  local file="$1"
+  local key="$2"
+  awk -v key="$key" '
+    index($0, key "=") == 1 {
+      if (found) exit 2
+      value = substr($0, length(key) + 2)
+      found = 1
+    }
+    END {
+      if (found) print value
+      else exit 1
+    }
+  ' "$file"
+}
+
+if [[ ! -f "$SCRIPT_DIR/config.env" ]]; then
+  echo "ERROR: Missing configuration file: $SCRIPT_DIR/config.env"
+  exit 1
+fi
+
+for variable in ODOO_VERSION ODOO_PORT POSTGRES_VERSION POSTGRES_DB POSTGRES_USER; do
+  if ! value="$(read_env_value "$SCRIPT_DIR/config.env" "$variable")"; then
+    echo "ERROR: Required configuration value is missing or duplicated: $variable"
+    echo "Check config.env and provide exactly one KEY=value entry."
+    exit 1
+  fi
+  printf -v "$variable" '%s' "$value"
+done
 
 if [[ $EUID -ne 0 ]]; then
   echo "ERROR: Run as root: sudo ./install.sh"
@@ -93,7 +123,14 @@ EOF
   chmod 600 "$POSTGRES_PASSWORD_FILE"
 else
   echo "==> Existing .env found; keeping existing credentials"
-  source "$POSTGRES_PASSWORD_FILE"
+  for variable in ODOO_VERSION ODOO_PORT POSTGRES_VERSION POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+    if ! value="$(read_env_value "$POSTGRES_PASSWORD_FILE" "$variable")"; then
+      echo "ERROR: Existing .env has a missing or duplicated value: $variable"
+      echo "Refusing to continue with ambiguous credentials."
+      exit 1
+    fi
+    printf -v "$variable" '%s' "$value"
+  done
 fi
 
 if [[ ! -f config/odoo.conf ]]; then
