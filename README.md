@@ -40,7 +40,7 @@ Odoo and PostgreSQL are isolated from the host operating system. Data is stored 
 
 Edit `config.env` before installation to change the Odoo version, port, PostgreSQL version, database name, or database user.
 
-The installer creates a local `.env` containing generated credentials. It is excluded from Git.
+The installer creates a local `.env` containing generated credentials. It is excluded from Git. Configuration files are parsed as simple `KEY=value` data; they are not executed as shell scripts.
 
 ## Useful commands
 
