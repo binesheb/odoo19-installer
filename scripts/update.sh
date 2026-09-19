@@ -11,10 +11,10 @@ docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required"
 
 [ -f .env ] || { echo ".env is missing; run the installer first" >&2; exit 1; }
 
-git diff --quiet && git diff --cached --quiet || {
-  echo "Refusing to update with local changes." >&2
+if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+  echo "Refusing to update with local changes or untracked files." >&2
   exit 1
-}
+fi
 
 git fetch origin "$BRANCH" --prune
 LOCAL="$(git rev-parse HEAD)"
