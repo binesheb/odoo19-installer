@@ -42,6 +42,28 @@ Edit `config.env` before installation to change the Odoo version, port, PostgreS
 
 The installer creates a local `.env` containing generated credentials. It is excluded from Git. Configuration files are parsed as simple `KEY=value` data; they are not executed as shell scripts.
 
+## Updating an installed deployment
+
+Use the guarded update script from the cloned repository:
+
+```bash
+sudo ./scripts/update.sh
+```
+
+The updater is deliberately conservative. It:
+
+- refuses to run when tracked or untracked local changes exist;
+- fetches `origin/main` and requires the local history to be fast-forwardable;
+- validates the Compose configuration before deployment;
+- pulls the configured container images;
+- waits for the database and Odoo health checks after the update;
+- records the previous Git revision in `.last-update-revision` for operational traceability;
+- restores the previous Git revision and attempts to restart the stack if deployment fails.
+
+Do not edit the deployment repository in place before running the updater. Keep configuration and credentials in the generated `.env` and `config/odoo.conf` files, and back up PostgreSQL data before significant Odoo upgrades.
+
+If an update needs to be investigated manually, stop before making further changes and preserve `.last-update-revision` and the Docker/Compose logs for diagnosis.
+
 ## Useful commands
 
 Run these from the repository directory:
