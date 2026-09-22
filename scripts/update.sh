@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 BRANCH="main"
+EXPECTED_ORIGIN="https://github.com/binesheb/odoo19-installer.git"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
@@ -10,6 +11,15 @@ command -v docker >/dev/null || { echo "docker is required" >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required" >&2; exit 1; }
 
 [ -f .env ] || { echo ".env is missing; run the installer first" >&2; exit 1; }
+
+ORIGIN="$(git remote get-url origin 2>/dev/null || true)"
+case "$ORIGIN" in
+  "$EXPECTED_ORIGIN"|"git@github.com:binesheb/odoo19-installer.git"|"ssh://git@github.com/binesheb/odoo19-installer.git") ;;
+  *)
+    echo "Refusing update: origin is not the trusted binesheb/odoo19-installer repository." >&2
+    exit 1
+    ;;
+esac
 
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   echo "Refusing to update with local changes or untracked files." >&2
