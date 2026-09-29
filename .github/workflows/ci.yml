@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          bash -n install.sh
+          bash -n scripts/update.sh
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: .
+          additional_files: install.sh scripts/update.sh
+
+      - name: Compose configuration
+        run: |
+          printf '%s\n'             'ODOO_VERSION=19.0'             'ODOO_PORT=8069'             'POSTGRES_VERSION=15'             'POSTGRES_DB=postgres'             'POSTGRES_USER=odoo'             'POSTGRES_PASSWORD=ci-password' > .env
+          mkdir -p config addons
+          cat > config/odoo.conf <<'EOF'
+          [options]
+          admin_passwd = ci-master-password
+          db_host = db
+          db_port = 5432
+          db_user = odoo
+          db_password = ci-password
+          http_port = 8069
+          proxy_mode = False
+          addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
+          EOF
+          docker compose config
+
+      - name: Docker Compose smoke test
+        run: |
+          docker compose pull
+          docker compose up -d --wait --wait-timeout 180
+          docker compose ps
+          docker compose exec -T odoo python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8069/web/database/selector', timeout=10).status)"
+          docker compose down -v
