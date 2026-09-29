@@ -82,23 +82,48 @@ export DEBIAN_FRONTEND=noninteractive
 install_docker() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     echo "==> Docker and Compose already installed"
+    systemctl enable --now docker
     return
   fi
 
   echo "==> Installing Docker Engine and Compose"
   apt-get update
   apt-get install -y ca-certificates curl openssl
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-    -o /etc/apt/keyrings/docker.asc
-  chmod a+r /etc/apt/keyrings/docker.asc
 
-  . /etc/os-release
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" \
-    > /etc/apt/sources.list.d/docker.list
+  # Prefer Docker's official repository on supported Ubuntu releases.
+  # On other Ubuntu releases, fall back to Ubuntu's packaged Docker Engine.
+  DOCKER_CODENAME="${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}"
+  DOCKER_REPO_OK=false
 
-  apt-get update
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  if [[ "$DOCKER_CODENAME" == "jammy" || "$DOCKER_CODENAME" == "noble" || "$DOCKER_CODENAME" == "resolute" ]]; then
+    if curl -fsS --head "https://download.docker.com/linux/ubuntu/dists/$DOCKER_CODENAME/Release" >/dev/null; then
+      DOCKER_REPO_OK=true
+    fi
+  fi
+
+  if [[ "$DOCKER_REPO_OK" == true ]]; then
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+
+    cat > /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $DOCKER_CODENAME
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  else
+    echo "WARNING: Docker's official repository is not available for Ubuntu $DOCKER_CODENAME."
+    echo "Using Ubuntu's Docker packages instead."
+    apt-get update
+    apt-get install -y docker.io docker-compose-v2
+  fi
+
   systemctl enable --now docker
 }
 
